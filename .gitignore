@@ -27,7 +27,9 @@ Thumbs.db
 .idea/
 
 # -------------------------------------------------------------
-# Build outputs — kept committed for GitHub Pages to serve.
-# Local `.cache/` and other tooling scratch dirs excluded.
+# Build outputs — committed to the repo since Pages serves the
+# `build/` folder directly. `deploy.ps1` rebuilds before every push
+# so the committed bundle always matches the source.
+# Other tooling scratch dirs stay excluded.
 # -------------------------------------------------------------
 .cache/
