@@ -617,6 +617,12 @@ main { position: relative; z-index: 2; }
 .hero__title .line {
   display: block;
   overflow: hidden;
+  /* Padding-bottom gives descenders (g, y, j, p, q) room INSIDE the
+     overflow-hidden clip that hosts the rise-in reveal. Without it,
+     the 0.92 line-height and clip together crop the tails of 'g' in
+     names like "Tang Trung Son". 0.18em covers descender height for
+     Space Grotesk at any weight. (2025-11) */
+  padding-bottom: 0.18em;
 }
 .hero__title .line > span {
   display: inline-block;
@@ -1239,6 +1245,11 @@ main { position: relative; z-index: 2; }
 .contact-huge a {
   font-family: 'Space Grotesk', sans-serif;
   font-size: clamp(32px, 6vw, 72px);
+  /* Line-height 1.15 (was 1) — with `background-clip: text` the
+     gradient only paints inside the line box. line-height 1 clips
+     the box exactly at the baseline area, so descenders (g in
+     "@gmail") get no gradient and render as transparent. (2025-11) */
+  line-height: 1.15;
   font-weight: 500;
   letter-spacing: -0.03em;
   background: linear-gradient(120deg, var(--accent), var(--accent-2));
@@ -2423,10 +2434,15 @@ a.cert-name:focus-visible {
 .contact__email {
   display: inline-block;
   font-family: 'Space Grotesk', sans-serif;
+  /* Padding-bottom + wider line-height give descenders (g in
+     "@gmail.com") room to render — otherwise `background-clip: text`
+     paints only the line-box area and descender tails go transparent.
+     line-height override further below. (2025-11) */
+  padding-bottom: 0.08em;
   font-size: clamp(32px, 6vw, 84px);
   font-weight: 500;
   letter-spacing: -0.035em;
-  line-height: 1;
+  line-height: 1.15;
   background: linear-gradient(120deg, var(--accent), var(--accent-2) 55%, var(--accent-3));
   background-size: 200% 200%;
   -webkit-background-clip: text;
