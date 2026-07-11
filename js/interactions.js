@@ -729,6 +729,16 @@ export function initInteractions({
   // Click — poke SENTINEL + project card handoff
   // -----------------------------------------------------------
   const onClick = (e) => {
+    // Broad click SFX. Fire on any anchor / button / cursor-hover
+    // element the user actually clicked, EXCEPT the SFX toggle
+    // itself (main.js plays its own confirmation blip on unmute
+    // and we don't want double-triggering).
+    const t = e.target;
+    if (t && typeof t.closest === 'function') {
+      const clickable = t.closest('a, button, [data-cursor="hover"]');
+      if (clickable && clickable.id !== 'sfx-toggle') sfx.click();
+    }
+
     // Poke — click within POKE_RADIUS of SENTINEL fires the big
     // pulse + transient morph. Note: scene.js currently owns its
     // own capture-phase poke handler (fires triggerBigPulse); the

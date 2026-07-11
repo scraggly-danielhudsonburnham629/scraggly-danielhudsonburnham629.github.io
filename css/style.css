@@ -388,52 +388,44 @@ button { font-family: inherit; }
   pointer-events: none;
 }
 
-/* SFX mute toggle — persistent top-right circular button. Shows the
-   speaker glyph when audio is on, the crossed-out speaker when muted.
-   Colour follows the accent so it visually pairs with SENTINEL. */
-.sfx-toggle {
-  position: fixed;
-  top: 22px;
-  right: 22px;
-  z-index: 30;
-  width: 36px;
-  height: 36px;
+/* Nav SFX toggle — sits inline in the nav header next to Résumé.
+   Bare speaker glyph; icon flips to muted-speaker on toggle. Same
+   colour language as `.nav__cta` so it pairs visually. */
+.nav__sfx {
+  margin-left: 14px;
   padding: 0;
+  width: 32px;
+  height: 32px;
+  background: transparent;
   border: 1px solid var(--border);
   border-radius: 999px;
-  background: rgba(6, 6, 11, 0.7);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  color: var(--accent);
+  color: var(--text-dim);
   cursor: pointer;
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  transition: color 200ms var(--ease), border-color 200ms var(--ease),
-              transform 220ms var(--ease), background 200ms var(--ease);
+  transition: color 200ms var(--ease), border-color 200ms var(--ease);
 }
-.sfx-toggle:hover {
-  color: var(--accent-2);
-  border-color: rgba(167, 139, 250, 0.4);
-  transform: scale(1.05);
+.nav__sfx:hover,
+.nav__sfx:focus-visible {
+  color: var(--accent);
+  border-color: var(--accent);
+  outline: none;
 }
-.sfx-toggle:active { transform: scale(0.95); }
-.sfx-toggle__icon {
-  width: 18px;
-  height: 18px;
+.nav__sfx-icon {
+  width: 16px;
+  height: 16px;
   display: none;
 }
-.sfx-toggle__icon--on  { display: block; }
-.sfx-toggle.is-muted { color: var(--text-mute); }
-.sfx-toggle.is-muted:hover { color: var(--danger); }
-.sfx-toggle.is-muted .sfx-toggle__icon--on  { display: none; }
-.sfx-toggle.is-muted .sfx-toggle__icon--off { display: block; }
+.nav__sfx-icon--on  { display: block; }
+.nav__sfx.is-muted { color: var(--text-mute); }
+.nav__sfx.is-muted:hover { color: var(--danger); border-color: var(--danger); }
+.nav__sfx.is-muted .nav__sfx-icon--on  { display: none; }
+.nav__sfx.is-muted .nav__sfx-icon--off { display: block; }
 
-/* Push the toggle further inboard on mobile so it doesn't fight the
-   status widget's mobile pinned position (bottom-right ~190 px up). */
 @media (max-width: 720px) {
-  .sfx-toggle { top: 16px; right: 16px; width: 32px; height: 32px; }
-  .sfx-toggle__icon { width: 16px; height: 16px; }
+  .nav__sfx { margin-left: 10px; width: 28px; height: 28px; }
+  .nav__sfx-icon { width: 14px; height: 14px; }
 }
 
 /* Companion HUD — DOM label that follows the 3D drone.
