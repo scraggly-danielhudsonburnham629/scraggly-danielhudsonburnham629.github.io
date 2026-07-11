@@ -1,27 +1,16 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32" fill="none">
+<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
   <!--
-    SENTINEL favicon (v5) — the wireframe polyhedron from the hero,
-    on the site's dark backdrop, with a cyan → violet shimmer stroke.
-    Just the main shape, no scan ring or center dot.
+    SENTINEL favicon (v6) — a single filled hexagon with the cyan →
+    violet shimmer gradient. No backdrop, no interior wireframe: at
+    16 px the thin lines aliased into corner artefacts. A solid
+    filled shape renders clean at every browser tab size.
   -->
   <defs>
-    <linearGradient id="fv-stroke" x1="0" y1="0" x2="32" y2="32" gradientUnits="userSpaceOnUse">
+    <linearGradient id="fv-fill" x1="0" y1="0" x2="32" y2="32" gradientUnits="userSpaceOnUse">
       <stop offset="0%"   stop-color="#6ee7f9"/>
       <stop offset="55%"  stop-color="#a5f3fc"/>
       <stop offset="100%" stop-color="#a78bfa"/>
     </linearGradient>
-    <radialGradient id="fv-bg" cx="50%" cy="45%" r="70%">
-      <stop offset="0%"   stop-color="#101024"/>
-      <stop offset="100%" stop-color="#06060b"/>
-    </radialGradient>
   </defs>
-
-  <rect width="32" height="32" rx="6" fill="url(#fv-bg)"/>
-
-  <g fill="none" stroke="url(#fv-stroke)" stroke-width="1.4"
-     stroke-linejoin="round" stroke-linecap="round">
-    <polygon points="16,5 25.5,10.5 25.5,21.5 16,27 6.5,21.5 6.5,10.5"/>
-    <polygon points="16,5 25.5,21.5 6.5,21.5"/>
-    <polygon points="16,27 6.5,10.5 25.5,10.5"/>
-  </g>
+  <polygon points="16,3 27.5,10 27.5,22 16,29 4.5,22 4.5,10" fill="url(#fv-fill)"/>
 </svg>
