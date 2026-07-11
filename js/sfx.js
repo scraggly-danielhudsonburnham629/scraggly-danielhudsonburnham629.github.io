@@ -527,33 +527,24 @@ export function enterApproach() {
 }
 
 export function enterJourney() {
-  // Spinning disc in space — accelerating "wuh-wuh" via tremolo +
-  // vibrato at the same rate, ramping from slow to fast over 1.4 s.
-  // Base pitch raised to A3 (220 Hz) so the rotation actually reads
-  // on laptop speakers — 130 Hz was under the roll-off of most
-  // consumer playback. Two-voice layer (fundamental + octave) so
-  // there's audible content in the mids too. Duration extended so
-  // the accel lines up with SENTINEL's visible spin ramp-up.
+  // Subtle spin-up cue — a short soft swell that hands off to the
+  // sustained `droneJourney` (which plays for the whole section).
+  // Very brief and quiet so it doesn't dominate the entry.
   play((c, out) => {
-    rotate(c, out, {
-      baseFreq: 220,
-      startRate: 1.4,
-      endRate: 6.5,
-      duration: 1.4,
-      peak: 0.42,
-      filterFreq: 1600,
-      filterQ: 2,
-    });
-    // Octave-up layer for presence in the mids.
-    rotate(c, out, {
-      baseFreq: 440,
-      startRate: 1.4,
-      endRate: 6.5,
-      duration: 1.4,
-      peak: 0.18,
-      filterFreq: 2400,
-      filterQ: 1.4,
-    });
+    const now = c.currentTime;
+    const dur = 0.9;
+    const osc = c.createOscillator();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(147, now);
+    osc.frequency.linearRampToValueAtTime(220, now + dur);
+    const filt = c.createBiquadFilter();
+    filt.type = 'lowpass'; filt.frequency.value = 600; filt.Q.value = 1.2;
+    const g = c.createGain();
+    g.gain.setValueAtTime(0, now);
+    g.gain.linearRampToValueAtTime(0.12, now + 0.15);
+    g.gain.exponentialRampToValueAtTime(0.0001, now + dur);
+    osc.connect(filt).connect(g).connect(out);
+    osc.start(now); osc.stop(now + dur + 0.05);
   });
 }
 
@@ -677,6 +668,224 @@ export function enterSection(idx) {
 }
 
 // -------------------------------------------------------------
+// Section drones — a subtle sustained layer per section that plays
+// the entire time SENTINEL is in that mode. Fades in over 2 s on
+// section enter, out over 1.5 s on leave. All very quiet (peak
+// gain ≤ 0.05) so they read as atmosphere, not events.
+//
+// Each drone is a single running audio graph the module owns
+// (`currentDrone.stop()` fades + tears it down). Only one drone
+// active at a time; changing sections cross-fades cleanly.
+// -------------------------------------------------------------
+
+let currentDrone = null;
+
+function makeDrone(builder) {
+  return (c, dest) => {
+    const g = c.createGain();
+    g.gain.setValueAtTime(0, c.currentTime);
+    g.gain.linearRampToValueAtTime(1, c.currentTime + 2.0);
+    const nodes = builder(c, g);
+    g.connect(dest);
+
+    let stopped = false;
+    return {
+      stop() {
+        if (stopped) return;
+        stopped = true;
+        const n = c.currentTime;
+        g.gain.cancelScheduledValues(n);
+        g.gain.setValueAtTime(g.gain.value, n);
+        g.gain.linearRampToValueAtTime(0, n + 1.5);
+        setTimeout(() => {
+          nodes.forEach((node) => { try { node.stop && node.stop(); } catch (_e) {} });
+        }, 1700);
+      },
+    };
+  };
+}
+
+// Approach — soft analyzing pad. Two low sustained tones (A2 + E3)
+// with slight filter movement. Reads as "SENTINEL focusing."
+const droneApproach = makeDrone((c, g) => {
+  const osc1 = c.createOscillator();
+  const osc2 = c.createOscillator();
+  osc1.type = 'sine'; osc2.type = 'sine';
+  osc1.frequency.value = 110; // A2
+  osc2.frequency.value = 164.81; // E3
+  const filt = c.createBiquadFilter();
+  filt.type = 'lowpass'; filt.frequency.value = 500; filt.Q.value = 1.2;
+  const lfo = c.createOscillator();
+  lfo.type = 'sine';
+  lfo.frequency.value = 1 / 30;
+  const lfoDepth = c.createGain(); lfoDepth.gain.value = 180;
+  lfo.connect(lfoDepth).connect(filt.frequency);
+  const level = c.createGain(); level.gain.value = 0.045;
+  osc1.connect(filt); osc2.connect(filt);
+  filt.connect(level).connect(g);
+  const now = c.currentTime;
+  osc1.start(now); osc2.start(now); lfo.start(now);
+  return [osc1, osc2, lfo];
+});
+
+// Journey — subtle sci-fi rotation. Distant "wuh-wuh" tremolo at
+// a fixed slow rate (3 Hz), NOT accelerating. Very quiet — reads
+// as a spinning object heard from far away, playing continuously
+// while SENTINEL's ring is spinning at trace-mode speed.
+const droneJourney = makeDrone((c, g) => {
+  const osc = c.createOscillator();
+  osc.type = 'sine';
+  osc.frequency.value = 165; // E3 — sits under everything
+  const filt = c.createBiquadFilter();
+  filt.type = 'lowpass'; filt.frequency.value = 500; filt.Q.value = 1.5;
+  // Amp tremolo (the "wuh-wuh")
+  const trem = c.createOscillator();
+  trem.type = 'sine';
+  trem.frequency.value = 3.0; // slow, steady rotation
+  const tremDepth = c.createGain(); tremDepth.gain.value = 0.55;
+  trem.connect(tremDepth);
+  // Vibrato at same rate for coherent wobble
+  const vib = c.createOscillator();
+  vib.type = 'sine';
+  vib.frequency.value = 3.0;
+  const vibDepth = c.createGain(); vibDepth.gain.value = 4;
+  vib.connect(vibDepth).connect(osc.frequency);
+
+  const level = c.createGain();
+  level.gain.value = 0; // base level; tremolo adds on top
+  tremDepth.connect(level.gain);
+  // Ensure gain floor above 0 so we always hear the tone through the
+  // tremolo swing. Base 0.03 + tremolo swing ±0.03 → 0..0.06.
+  level.gain.setValueAtTime(0.03, c.currentTime);
+
+  osc.connect(filt).connect(level).connect(g);
+  const now = c.currentTime;
+  osc.start(now); trem.start(now); vib.start(now);
+  return [osc, trem, vib];
+});
+
+// Work — steady scanning drone. Low sustained tone with a slow
+// filter open/close. "SENTINEL indexing."
+const droneWork = makeDrone((c, g) => {
+  const osc = c.createOscillator();
+  osc.type = 'sine';
+  osc.frequency.value = 147; // D3
+  const filt = c.createBiquadFilter();
+  filt.type = 'lowpass'; filt.frequency.value = 600; filt.Q.value = 1;
+  const lfo = c.createOscillator();
+  lfo.type = 'sine';
+  lfo.frequency.value = 1 / 24;
+  const lfoDepth = c.createGain(); lfoDepth.gain.value = 240;
+  lfo.connect(lfoDepth).connect(filt.frequency);
+  const level = c.createGain(); level.gain.value = 0.04;
+  osc.connect(filt).connect(level).connect(g);
+  const now = c.currentTime;
+  osc.start(now); lfo.start(now);
+  return [osc, lfo];
+});
+
+// Skills — high shimmer cluster. Two close-tuned high sines for a
+// gentle beating texture. Reads as "SENTINEL parsing." Very quiet.
+const droneSkills = makeDrone((c, g) => {
+  const osc1 = c.createOscillator();
+  const osc2 = c.createOscillator();
+  osc1.type = 'sine'; osc2.type = 'sine';
+  osc1.frequency.value = 660; // E5
+  osc2.frequency.value = 661.8; // beats every ~0.6 s → texture
+  const filt = c.createBiquadFilter();
+  filt.type = 'bandpass'; filt.frequency.value = 660; filt.Q.value = 3;
+  const level = c.createGain(); level.gain.value = 0.028;
+  osc1.connect(filt); osc2.connect(filt);
+  filt.connect(level).connect(g);
+  const now = c.currentTime;
+  osc1.start(now); osc2.start(now);
+  return [osc1, osc2];
+});
+
+// Recognition — verify tone. Sustained metallic note (E3 + inharmonic
+// partial). Reads as "SENTINEL evaluating."
+const droneRecognition = makeDrone((c, g) => {
+  const osc = c.createOscillator();
+  osc.type = 'triangle';
+  osc.frequency.value = 165; // E3
+  const oscP = c.createOscillator();
+  oscP.type = 'sine';
+  oscP.frequency.value = 165 * 2.76; // ~455 Hz (inharmonic for metal colour)
+  const filt = c.createBiquadFilter();
+  filt.type = 'lowpass'; filt.frequency.value = 1400; filt.Q.value = 0.7;
+  const level = c.createGain(); level.gain.value = 0.04;
+  const pLevel = c.createGain(); pLevel.gain.value = 0.015;
+  osc.connect(filt);
+  oscP.connect(pLevel).connect(filt);
+  filt.connect(level).connect(g);
+  const now = c.currentTime;
+  osc.start(now); oscP.start(now);
+  return [osc, oscP];
+});
+
+// Vision — expansive pad. Sustained A/E/A triad, wide.
+const droneVision = makeDrone((c, g) => {
+  const notes = [220, 330, 440];
+  const oscs = notes.map((freq) => {
+    const o = c.createOscillator();
+    o.type = 'triangle';
+    o.frequency.value = freq;
+    return o;
+  });
+  const filt = c.createBiquadFilter();
+  filt.type = 'lowpass'; filt.frequency.value = 1600; filt.Q.value = 0.7;
+  const level = c.createGain(); level.gain.value = 0.035;
+  oscs.forEach((o) => o.connect(filt));
+  filt.connect(level).connect(g);
+  const now = c.currentTime;
+  oscs.forEach((o) => o.start(now));
+  return oscs;
+});
+
+// Contact — soft listening tone. Sub A3 sine, very quiet. Sits under
+// the hover hum without competing.
+const droneContact = makeDrone((c, g) => {
+  const osc = c.createOscillator();
+  osc.type = 'sine';
+  osc.frequency.value = 220;
+  const filt = c.createBiquadFilter();
+  filt.type = 'lowpass'; filt.frequency.value = 700; filt.Q.value = 1;
+  const level = c.createGain(); level.gain.value = 0.03;
+  osc.connect(filt).connect(level).connect(g);
+  const now = c.currentTime;
+  osc.start(now);
+  return [osc];
+});
+
+const SECTION_DRONES = [
+  null,             // 0 Hero — the ambient bed is enough
+  droneApproach,    // 1
+  droneJourney,     // 2
+  droneWork,        // 3
+  droneSkills,      // 4
+  droneRecognition, // 5
+  droneVision,      // 6
+  droneContact,     // 7
+];
+
+/** Swap the currently playing section drone. Called from main.js
+ *  on section change. Cross-fades cleanly. */
+export function setSectionDrone(idx) {
+  if (currentDrone) {
+    currentDrone.stop();
+    currentDrone = null;
+  }
+  if (!enabled) return;
+  const builder = SECTION_DRONES[idx | 0];
+  if (!builder) return;
+  const c = ensureCtx();
+  if (!c) return;
+  if (c.state === 'suspended') c.resume();
+  // Drones go straight to the SFX bus (no reverb, they'd smear).
+  currentDrone = builder(c, sfxBus);
+}
+
+// -------------------------------------------------------------
 // Section-specific SFX
 // -------------------------------------------------------------
 
@@ -701,12 +910,10 @@ export function analyze() {
   });
 }
 
-// Skills scan-fan / parsing — sustained tonal sweep + granular
-// ticks that read as SENTINEL actually reading through the group.
-// The sweep is a rising-then-falling filter on a warm sawtooth
-// pair; the ticks are 4-6 short high sines fired at random times
-// during the sweep window, so each item in the manifest sounds
-// like it's being touched by the beam.
+// Skills scan-fan / parsing — subtle warm sweep that hands off to
+// the sustained `droneSkills`. Just a soft filter open + close on
+// a single low sine. Reads as SENTINEL glancing across the group,
+// not a laser scan.
 let lastLaserAt = 0;
 export function laser() {
   const nowT = performance.now();
@@ -715,53 +922,21 @@ export function laser() {
   play((c, out) => {
     const now = c.currentTime;
     const dur = 1.0;
-
-    // (1) Tonal sweep — two sawtooths through a shared lowpass.
-    // Filter frequency rises 500 → 2600 Hz then falls back to 900,
-    // so it reads as a beam sweeping and returning.
-    const osc1 = c.createOscillator();
-    const osc2 = c.createOscillator();
-    osc1.type = 'sawtooth'; osc2.type = 'sawtooth';
-    osc1.frequency.value = 220; // A3
-    osc2.frequency.value = 275; // C#4 — third for colour
+    const osc = c.createOscillator();
+    osc.type = 'sine';
+    osc.frequency.value = 220;
     const filt = c.createBiquadFilter();
-    filt.type = 'lowpass'; filt.Q.value = 4;
+    filt.type = 'lowpass'; filt.Q.value = 2;
     filt.frequency.setValueAtTime(500, now);
-    filt.frequency.exponentialRampToValueAtTime(2600, now + dur * 0.55);
-    filt.frequency.exponentialRampToValueAtTime(900, now + dur);
+    filt.frequency.exponentialRampToValueAtTime(1400, now + dur * 0.5);
+    filt.frequency.exponentialRampToValueAtTime(700, now + dur);
     const g = c.createGain();
     g.gain.setValueAtTime(0, now);
-    g.gain.linearRampToValueAtTime(0.22, now + 0.1);
-    g.gain.linearRampToValueAtTime(0.15, now + dur * 0.7);
+    g.gain.linearRampToValueAtTime(0.10, now + 0.15);
+    g.gain.linearRampToValueAtTime(0.06, now + dur * 0.7);
     g.gain.exponentialRampToValueAtTime(0.0001, now + dur);
-    osc1.connect(filt); osc2.connect(filt);
-    filt.connect(g).connect(out);
-    osc1.start(now); osc2.start(now);
-    osc1.stop(now + dur + 0.05); osc2.stop(now + dur + 0.05);
-
-    // (2) Granular ticks — 6 short high sines at random offsets
-    // through the sweep window. Reads as parsing individual data
-    // points. Each tick is a 30 ms sine chirp, pitched randomly
-    // in a narrow band so they don't sound like a melody.
-    const tickBaseFreqs = [2400, 2600, 2800, 3000, 3200, 3400];
-    for (let i = 0; i < 6; i++) {
-      const at = 0.15 + Math.random() * (dur - 0.35);
-      const freq = tickBaseFreqs[i] + (Math.random() - 0.5) * 200;
-      setTimeout(() => {
-        play((cc, oo) => {
-          const t = cc.currentTime;
-          const tOsc = cc.createOscillator();
-          tOsc.type = 'sine';
-          tOsc.frequency.value = freq;
-          const tG = cc.createGain();
-          tG.gain.setValueAtTime(0, t);
-          tG.gain.linearRampToValueAtTime(0.08, t + 0.003);
-          tG.gain.exponentialRampToValueAtTime(0.0001, t + 0.05);
-          tOsc.connect(tG).connect(oo);
-          tOsc.start(t); tOsc.stop(t + 0.06);
-        });
-      }, at * 1000);
-    }
+    osc.connect(filt).connect(g).connect(out);
+    osc.start(now); osc.stop(now + dur + 0.05);
   });
 }
 
@@ -791,11 +966,10 @@ export function broadcast() {
   });
 }
 
-// Contact meta hover — sustained scanning hum. Triangle dyad
-// (A3 + E4) with a bandpass filter whose centre frequency slowly
-// modulates via an LFO — reads as "scanning" rather than a flat
-// hum. Gain bumped so it's clearly audible over the ambient bed.
-// Returns { stop } handle for on-leave cleanup.
+// Contact meta hover — subtle sustained hum. A3 sine through a
+// lowpass with very slow filter movement (12 s cycle). Quieter and
+// steadier than the previous "scanning wa-wa" — sits under the
+// section drone as a gentle focus tone. Returns { stop } handle.
 export function hum() {
   if (!enabled) return { stop: () => {} };
   const c = ensureCtx();
@@ -804,33 +978,30 @@ export function hum() {
   const now = c.currentTime;
 
   const out = toSfxBus();
-  const osc1 = c.createOscillator();
-  const osc2 = c.createOscillator();
-  osc1.type = 'triangle'; osc2.type = 'triangle';
-  osc1.frequency.value = 220;   // A3
-  osc2.frequency.value = 330;   // E4 (perfect fifth)
+  const osc = c.createOscillator();
+  osc.type = 'sine';
+  osc.frequency.value = 220; // A3
 
-  // Bandpass filter with LFO on centre freq — gives the hum a
-  // scanning "wa-wa" character (like a stereo panning searchlight).
   const filt = c.createBiquadFilter();
-  filt.type = 'bandpass';
-  filt.frequency.value = 900;
-  filt.Q.value = 4;
+  filt.type = 'lowpass';
+  filt.frequency.value = 800;
+  filt.Q.value = 1.5;
 
+  // Slow LFO drifts the filter opening — 12 s cycle so it barely
+  // moves during a typical hover. No pumping wa-wa.
   const lfo = c.createOscillator();
   lfo.type = 'sine';
-  lfo.frequency.value = 1.4; // 1.4 Hz — slow scan
+  lfo.frequency.value = 1 / 12;
   const lfoDepth = c.createGain();
-  lfoDepth.gain.value = 500; // ±500 Hz around 900 Hz centre
+  lfoDepth.gain.value = 180;
   lfo.connect(lfoDepth).connect(filt.frequency);
 
   const g = c.createGain();
   g.gain.setValueAtTime(0, now);
-  g.gain.linearRampToValueAtTime(0.22, now + 0.25);
+  g.gain.linearRampToValueAtTime(0.06, now + 0.3);
 
-  osc1.connect(filt); osc2.connect(filt);
-  filt.connect(g).connect(out);
-  osc1.start(now); osc2.start(now); lfo.start(now);
+  osc.connect(filt).connect(g).connect(out);
+  osc.start(now); lfo.start(now);
 
   let stopped = false;
   return {
@@ -840,10 +1011,10 @@ export function hum() {
       const nowS = c.currentTime;
       g.gain.cancelScheduledValues(nowS);
       g.gain.setValueAtTime(g.gain.value, nowS);
-      g.gain.linearRampToValueAtTime(0, nowS + 0.25);
+      g.gain.linearRampToValueAtTime(0, nowS + 0.3);
       setTimeout(() => {
-        try { osc1.stop(); osc2.stop(); lfo.stop(); } catch (_e) {}
-      }, 300);
+        try { osc.stop(); lfo.stop(); } catch (_e) {}
+      }, 350);
     },
   };
 }
@@ -920,13 +1091,15 @@ function startAmbient() {
   const fadeIn = 8; // long lift-in so unmute isn't jarring
 
   // -------- (1) Sub bass drone --------
+  // Slowed LFO cycle 15 s → 40 s so the breath is imperceptible
+  // rather than "waves."
   const sub = c.createOscillator();
   sub.type = 'sine';
   sub.frequency.value = 55; // A1
 
   const subLfo = c.createOscillator();
   subLfo.type = 'sine';
-  subLfo.frequency.value = 1 / 15;
+  subLfo.frequency.value = 1 / 40;
   const subLfoGain = c.createGain();
   subLfoGain.gain.value = 0.28;
   subLfo.connect(subLfoGain);
@@ -940,23 +1113,23 @@ function startAmbient() {
   // -------- (2) Am9 chord pad --------
   // Frequencies for A2 C3 E3 G3 B3 — the 1 b3 5 b7 9 of Am.
   const chordFreqs = [110.0, 130.81, 164.81, 196.0, 246.94];
-  // Very tiny detune per voice for slow beating.
-  const detunes    = [ +2, -3, +1, -2, +3 ]; // cents
+  // Very tiny detune per voice — was ±3 cents which produced 5-8 s
+  // beat cycles; now ±1 cent gives 15-30 s beats. Barely perceptible
+  // movement rather than "waves."
+  const detunes    = [ +1, -1, +1, -1, +1 ]; // cents
 
-  // Shared lowpass filter with slow LFO for the chord bus. This is
-  // where the "movement" of a static chord comes from — you're
-  // hearing the same notes but the filter uncovers different
-  // partials over time.
+  // Filter LFO cycle 28 s → 70 s. The single slowest movement in
+  // the whole bed. Reads as one continuous slow inhale/exhale.
   const chordFilt = c.createBiquadFilter();
   chordFilt.type = 'lowpass';
   chordFilt.Q.value = 4;
   const chordFiltLfo = c.createOscillator();
   chordFiltLfo.type = 'sine';
-  chordFiltLfo.frequency.value = 1 / 28;
+  chordFiltLfo.frequency.value = 1 / 70;
   const chordFiltLfoGain = c.createGain();
   chordFiltLfoGain.gain.value = 480;
   chordFiltLfo.connect(chordFiltLfoGain).connect(chordFilt.frequency);
-  chordFilt.frequency.value = 700; // centre; LFO swings ±480
+  chordFilt.frequency.value = 700;
 
   const chordBus = c.createGain();
   chordBus.gain.setValueAtTime(0, now);
@@ -964,8 +1137,6 @@ function startAmbient() {
   chordFilt.connect(chordBus).connect(musicBus);
 
   const voices = chordFreqs.map((freq, i) => {
-    // Two sawtooths per voice, slightly detuned, mixed together —
-    // gives the pad thickness without being buzzy.
     const oscA = c.createOscillator();
     const oscB = c.createOscillator();
     oscA.type = 'sawtooth';
@@ -976,12 +1147,11 @@ function startAmbient() {
     oscB.detune.value = -detunes[i] * 1.3;
 
     const voiceGain = c.createGain();
-    // Each voice's individual amp LFO — different rate per voice
-    // so the group breathes asynchronously. Base around 0.55, swing
-    // ±0.15, so no voice ever fully drops out.
+    // Individual voice LFO rates 18-34 s → 45-85 s. Voices phase in
+    // and out against each other so slowly you almost don't notice.
     const vLfo = c.createOscillator();
     vLfo.type = 'sine';
-    vLfo.frequency.value = 1 / (18 + i * 4); // 18, 22, 26, 30, 34 s
+    vLfo.frequency.value = 1 / (45 + i * 10);
     const vLfoGain = c.createGain();
     vLfoGain.gain.value = 0.15;
     vLfo.connect(vLfoGain);
@@ -1012,7 +1182,7 @@ function startAmbient() {
 
   const shimLfo = c.createOscillator();
   shimLfo.type = 'sine';
-  shimLfo.frequency.value = 1 / 35;
+  shimLfo.frequency.value = 1 / 80; // was 35 s
   const shimLfoGain = c.createGain();
   shimLfoGain.gain.value = 0.06;
   shimLfo.connect(shimLfoGain);
@@ -1043,10 +1213,10 @@ function startAmbient() {
   chorF2.type = 'bandpass'; chorF2.Q.value = 8; chorF2.frequency.value = 1100;
 
   // Very slow LFO drifts the formants slightly — reads as vowel
-  // shift from "ah" to "oh" and back.
+  // shift from "ah" to "oh" and back. 42 s → 100 s cycle.
   const chorLfo = c.createOscillator();
   chorLfo.type = 'sine';
-  chorLfo.frequency.value = 1 / 42;
+  chorLfo.frequency.value = 1 / 100;
   const chorLfoGain = c.createGain();
   chorLfoGain.gain.value = 140;
   chorLfo.connect(chorLfoGain).connect(chorF1.frequency);
@@ -1118,6 +1288,8 @@ export function setEnabled(v) {
     if (unlocked) startAmbient();
   } else if (wasEnabled) {
     stopAmbient();
+    // Also stop any section drone playing when the user mutes.
+    if (currentDrone) { currentDrone.stop(); currentDrone = null; }
   }
 }
 

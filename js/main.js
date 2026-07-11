@@ -619,11 +619,14 @@ function boot() {
       // hero copy, but competes with content in later sections. Hide
       // as soon as SENTINEL crosses out of hero (section index > 0).
       if (statusEl) statusEl.classList.toggle('is-hidden', idx > 0);
-      // Per-section entry cue — distinct sound per SENTINEL mode.
-      // See sfx.enterSection docstring for the palette. Hero (idx 0)
-      // fires as the loader clears which is fine; audio unlock waits
-      // for the user gesture so nothing plays before consent.
+      // Per-section entry cue — a brief swell matched to what
+      // SENTINEL is about to do. Section drone (below) is what
+      // sustains for the rest of the time in that section.
       sfx.enterSection(idx);
+      // Continuous per-section drone — very subtle sustained texture
+      // that plays for as long as the user stays in this section.
+      // Fades out cleanly when the next section's drone takes over.
+      sfx.setSectionDrone(idx);
     },
   });
   initCardHover();
