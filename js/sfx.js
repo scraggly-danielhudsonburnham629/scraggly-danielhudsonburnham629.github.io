@@ -62,22 +62,22 @@ function ensureCtx() {
   masterGain.connect(ctx.destination);
 
   sfxBus = ctx.createGain();
-  sfxBus.gain.value = 0.11; // slight cut to keep headroom for overlaps
+  sfxBus.gain.value = 0.20; // SFX audible — compressor catches peaks
   // Soft compressor as a safety limiter — catches any transient
   // peaks so multiple sounds firing at once never hard-clip the
-  // destination. Threshold -12 dB, gentle 3:1 ratio, fast attack,
+  // destination. Threshold -10 dB, gentle 4:1 ratio, fast attack,
   // moderate release. Doesn't colour normal-level content.
   const sfxComp = ctx.createDynamicsCompressor();
-  sfxComp.threshold.value = -12;
+  sfxComp.threshold.value = -10;
   sfxComp.knee.value = 6;
-  sfxComp.ratio.value = 3;
+  sfxComp.ratio.value = 4;
   sfxComp.attack.value = 0.003;
   sfxComp.release.value = 0.15;
   sfxBus.connect(sfxComp).connect(masterGain);
 
-  // Music at 1.2 % — barely present, just atmosphere.
+  // Music at 0.5 % — very faint atmosphere, sits well under SFX.
   musicBus = ctx.createGain();
-  musicBus.gain.value = 0.012;
+  musicBus.gain.value = 0.005;
   musicBus.connect(masterGain);
 
   reverb = createSpace(ctx, sfxBus);
@@ -322,9 +322,10 @@ export function click() {
 }
 
 // Poking SENTINEL — bigger than a click, more resonant. Reads as
-// SENTINEL reacting to being touched: sub-thump + longer harmonic
-// ring above + a brief airy shimmer for movement. Everything goes
-// through the reverb so it sits in the room.
+// SENTINEL reacting to being touched: sub-thump + mid impact +
+// harmonic ring + a brief airy shimmer. Every layer sits in a
+// different frequency band so all playback systems catch some of
+// it. Everything routes through the reverb send.
 let lastPokeAt = 0;
 export function poke() {
   const nowT = performance.now();
@@ -333,37 +334,50 @@ export function poke() {
   play((c, out) => {
     const now = c.currentTime;
 
-    // (1) Sub thump — sine sweep 90 → 40 Hz over 400 ms. Body of
-    // the poke; feels like SENTINEL got tapped.
+    // (1) Sub thump — sine sweep 120 → 55 Hz. Weight (may be
+    // inaudible on tiny laptop speakers, that's fine — layers 2+3
+    // cover them).
     const sub = c.createOscillator();
     sub.type = 'sine';
-    sub.frequency.setValueAtTime(90, now);
-    sub.frequency.exponentialRampToValueAtTime(40, now + 0.4);
+    sub.frequency.setValueAtTime(120, now);
+    sub.frequency.exponentialRampToValueAtTime(55, now + 0.4);
     const subG = c.createGain();
     subG.gain.setValueAtTime(0, now);
-    subG.gain.linearRampToValueAtTime(0.42, now + 0.008);
+    subG.gain.linearRampToValueAtTime(0.55, now + 0.008);
     subG.gain.exponentialRampToValueAtTime(0.0001, now + 0.5);
     sub.connect(subG).connect(out);
     sub.start(now); sub.stop(now + 0.55);
 
-    // (2) Harmonic ring — triangle up an octave, slower attack
-    // and longer decay. Reverb picks this up and creates a tail
-    // that lingers ~1 s. Reads as SENTINEL's body resonating.
+    // (2) Mid impact — 320 Hz triangle sweeping to 180 Hz. Sits in
+    // the vocal range so every device reproduces it clearly.
+    const mid = c.createOscillator();
+    mid.type = 'triangle';
+    mid.frequency.setValueAtTime(320, now);
+    mid.frequency.exponentialRampToValueAtTime(180, now + 0.35);
+    const midFilt = c.createBiquadFilter();
+    midFilt.type = 'lowpass'; midFilt.frequency.value = 2000; midFilt.Q.value = 0.7;
+    const midG = c.createGain();
+    midG.gain.setValueAtTime(0, now);
+    midG.gain.linearRampToValueAtTime(0.32, now + 0.008);
+    midG.gain.exponentialRampToValueAtTime(0.0001, now + 0.4);
+    mid.connect(midFilt).connect(midG).connect(out);
+    mid.start(now); mid.stop(now + 0.45);
+
+    // (3) Harmonic ring — E3 triangle with a long tail. Reverb
+    // picks this up and lingers ~1 s. Sentinel's body resonating.
     const harm = c.createOscillator();
     harm.type = 'triangle';
-    harm.frequency.value = 165; // E3
+    harm.frequency.value = 165;
     const harmFilt = c.createBiquadFilter();
     harmFilt.type = 'lowpass'; harmFilt.frequency.value = 1200; harmFilt.Q.value = 0.8;
     const harmG = c.createGain();
     harmG.gain.setValueAtTime(0, now);
-    harmG.gain.linearRampToValueAtTime(0.18, now + 0.04);
+    harmG.gain.linearRampToValueAtTime(0.22, now + 0.04);
     harmG.gain.exponentialRampToValueAtTime(0.0001, now + 1.0);
     harm.connect(harmFilt).connect(harmG).connect(out);
     harm.start(now); harm.stop(now + 1.1);
 
-    // (3) Airy shimmer — very brief highpass noise burst at the
-    // moment of contact. Bright but tiny, sells the "impact" without
-    // adding a game-y click.
+    // (4) Airy shimmer — highpass noise burst at contact.
     const buf = c.createBuffer(1, 512, c.sampleRate);
     const d = buf.getChannelData(0);
     for (let i = 0; i < 512; i++) d[i] = Math.random() * 2 - 1;
@@ -372,7 +386,7 @@ export function poke() {
     filt.type = 'highpass'; filt.frequency.value = 4500; filt.Q.value = 0.7;
     const g = c.createGain();
     g.gain.setValueAtTime(0, now);
-    g.gain.linearRampToValueAtTime(0.08, now + 0.005);
+    g.gain.linearRampToValueAtTime(0.15, now + 0.005);
     g.gain.exponentialRampToValueAtTime(0.0001, now + 0.08);
     src.connect(filt).connect(g).connect(out);
     src.start(now); src.stop(now + 0.1);
@@ -514,19 +528,31 @@ export function enterApproach() {
 
 export function enterJourney() {
   // Spinning disc in space — accelerating "wuh-wuh" via tremolo +
-  // vibrato at the same rate, ramping from slow to fast over 900ms.
-  // Matches SENTINEL's ring accelerating from rotSpeed ~1.6 to
-  // ~5.5 in trace mode. Uses the shared `rotate` helper so the
-  // sound is defined once and can be reused for any spin event.
+  // vibrato at the same rate, ramping from slow to fast over 1.4 s.
+  // Base pitch raised to A3 (220 Hz) so the rotation actually reads
+  // on laptop speakers — 130 Hz was under the roll-off of most
+  // consumer playback. Two-voice layer (fundamental + octave) so
+  // there's audible content in the mids too. Duration extended so
+  // the accel lines up with SENTINEL's visible spin ramp-up.
   play((c, out) => {
     rotate(c, out, {
-      baseFreq: 130,
+      baseFreq: 220,
       startRate: 1.4,
       endRate: 6.5,
-      duration: 0.9,
-      peak: 0.32,
-      filterFreq: 780,
-      filterQ: 2.4,
+      duration: 1.4,
+      peak: 0.42,
+      filterFreq: 1600,
+      filterQ: 2,
+    });
+    // Octave-up layer for presence in the mids.
+    rotate(c, out, {
+      baseFreq: 440,
+      startRate: 1.4,
+      endRate: 6.5,
+      duration: 1.4,
+      peak: 0.18,
+      filterFreq: 2400,
+      filterQ: 1.4,
     });
   });
 }
@@ -675,9 +701,12 @@ export function analyze() {
   });
 }
 
-// Skills scan-fan — airy sustained sweep. Lowpass (warm) rather
-// than bandpass (harsh), no FM whine. Reads as wave of energy
-// passing across the target, not a laser.
+// Skills scan-fan / parsing — sustained tonal sweep + granular
+// ticks that read as SENTINEL actually reading through the group.
+// The sweep is a rising-then-falling filter on a warm sawtooth
+// pair; the ticks are 4-6 short high sines fired at random times
+// during the sweep window, so each item in the manifest sounds
+// like it's being touched by the beam.
 let lastLaserAt = 0;
 export function laser() {
   const nowT = performance.now();
@@ -685,44 +714,54 @@ export function laser() {
   lastLaserAt = nowT;
   play((c, out) => {
     const now = c.currentTime;
-    const dur = 0.7;
+    const dur = 1.0;
 
-    // Warm noise wash with gentle lowpass sweep.
-    const buf = c.createBuffer(1, Math.floor(c.sampleRate * dur), c.sampleRate);
-    const d = buf.getChannelData(0);
-    let last = 0;
-    for (let i = 0; i < d.length; i++) {
-      const n = Math.random() * 2 - 1;
-      last = (last + n * 0.15) * 0.96;
-      d[i] = last;
-    }
-    const src = c.createBufferSource(); src.buffer = buf;
+    // (1) Tonal sweep — two sawtooths through a shared lowpass.
+    // Filter frequency rises 500 → 2600 Hz then falls back to 900,
+    // so it reads as a beam sweeping and returning.
+    const osc1 = c.createOscillator();
+    const osc2 = c.createOscillator();
+    osc1.type = 'sawtooth'; osc2.type = 'sawtooth';
+    osc1.frequency.value = 220; // A3
+    osc2.frequency.value = 275; // C#4 — third for colour
     const filt = c.createBiquadFilter();
-    filt.type = 'lowpass';
-    filt.Q.value = 1.2;
-    filt.frequency.setValueAtTime(400, now);
-    filt.frequency.exponentialRampToValueAtTime(1600, now + dur * 0.55);
-    filt.frequency.exponentialRampToValueAtTime(600, now + dur);
+    filt.type = 'lowpass'; filt.Q.value = 4;
+    filt.frequency.setValueAtTime(500, now);
+    filt.frequency.exponentialRampToValueAtTime(2600, now + dur * 0.55);
+    filt.frequency.exponentialRampToValueAtTime(900, now + dur);
     const g = c.createGain();
     g.gain.setValueAtTime(0, now);
-    g.gain.linearRampToValueAtTime(0.2, now + 0.15);
-    g.gain.linearRampToValueAtTime(0.12, now + dur * 0.75);
+    g.gain.linearRampToValueAtTime(0.22, now + 0.1);
+    g.gain.linearRampToValueAtTime(0.15, now + dur * 0.7);
     g.gain.exponentialRampToValueAtTime(0.0001, now + dur);
-    src.connect(filt).connect(g).connect(out);
-    src.start(now); src.stop(now + dur + 0.02);
+    osc1.connect(filt); osc2.connect(filt);
+    filt.connect(g).connect(out);
+    osc1.start(now); osc2.start(now);
+    osc1.stop(now + dur + 0.05); osc2.stop(now + dur + 0.05);
 
-    // Sub tonal presence under the sweep.
-    const osc = c.createOscillator();
-    osc.type = 'sine';
-    osc.frequency.setValueAtTime(200, now);
-    osc.frequency.exponentialRampToValueAtTime(320, now + dur * 0.5);
-    osc.frequency.exponentialRampToValueAtTime(180, now + dur);
-    const og = c.createGain();
-    og.gain.setValueAtTime(0, now);
-    og.gain.linearRampToValueAtTime(0.08, now + 0.15);
-    og.gain.exponentialRampToValueAtTime(0.0001, now + dur);
-    osc.connect(og).connect(out);
-    osc.start(now); osc.stop(now + dur + 0.02);
+    // (2) Granular ticks — 6 short high sines at random offsets
+    // through the sweep window. Reads as parsing individual data
+    // points. Each tick is a 30 ms sine chirp, pitched randomly
+    // in a narrow band so they don't sound like a melody.
+    const tickBaseFreqs = [2400, 2600, 2800, 3000, 3200, 3400];
+    for (let i = 0; i < 6; i++) {
+      const at = 0.15 + Math.random() * (dur - 0.35);
+      const freq = tickBaseFreqs[i] + (Math.random() - 0.5) * 200;
+      setTimeout(() => {
+        play((cc, oo) => {
+          const t = cc.currentTime;
+          const tOsc = cc.createOscillator();
+          tOsc.type = 'sine';
+          tOsc.frequency.value = freq;
+          const tG = cc.createGain();
+          tG.gain.setValueAtTime(0, t);
+          tG.gain.linearRampToValueAtTime(0.08, t + 0.003);
+          tG.gain.exponentialRampToValueAtTime(0.0001, t + 0.05);
+          tOsc.connect(tG).connect(oo);
+          tOsc.start(t); tOsc.stop(t + 0.06);
+        });
+      }, at * 1000);
+    }
   });
 }
 
@@ -752,8 +791,11 @@ export function broadcast() {
   });
 }
 
-// Contact meta hover — sustained low hum that rises from silence
-// when engaged, fades back when released. Returns { stop } handle.
+// Contact meta hover — sustained scanning hum. Triangle dyad
+// (A3 + E4) with a bandpass filter whose centre frequency slowly
+// modulates via an LFO — reads as "scanning" rather than a flat
+// hum. Gain bumped so it's clearly audible over the ambient bed.
+// Returns { stop } handle for on-leave cleanup.
 export function hum() {
   if (!enabled) return { stop: () => {} };
   const c = ensureCtx();
@@ -767,14 +809,28 @@ export function hum() {
   osc1.type = 'triangle'; osc2.type = 'triangle';
   osc1.frequency.value = 220;   // A3
   osc2.frequency.value = 330;   // E4 (perfect fifth)
+
+  // Bandpass filter with LFO on centre freq — gives the hum a
+  // scanning "wa-wa" character (like a stereo panning searchlight).
   const filt = c.createBiquadFilter();
-  filt.type = 'bandpass'; filt.frequency.value = 900; filt.Q.value = 3;
+  filt.type = 'bandpass';
+  filt.frequency.value = 900;
+  filt.Q.value = 4;
+
+  const lfo = c.createOscillator();
+  lfo.type = 'sine';
+  lfo.frequency.value = 1.4; // 1.4 Hz — slow scan
+  const lfoDepth = c.createGain();
+  lfoDepth.gain.value = 500; // ±500 Hz around 900 Hz centre
+  lfo.connect(lfoDepth).connect(filt.frequency);
+
   const g = c.createGain();
   g.gain.setValueAtTime(0, now);
-  g.gain.linearRampToValueAtTime(0.09, now + 0.25);
+  g.gain.linearRampToValueAtTime(0.22, now + 0.25);
+
   osc1.connect(filt); osc2.connect(filt);
   filt.connect(g).connect(out);
-  osc1.start(now); osc2.start(now);
+  osc1.start(now); osc2.start(now); lfo.start(now);
 
   let stopped = false;
   return {
@@ -785,7 +841,9 @@ export function hum() {
       g.gain.cancelScheduledValues(nowS);
       g.gain.setValueAtTime(g.gain.value, nowS);
       g.gain.linearRampToValueAtTime(0, nowS + 0.25);
-      setTimeout(() => { try { osc1.stop(); osc2.stop(); } catch (_e) {} }, 300);
+      setTimeout(() => {
+        try { osc1.stop(); osc2.stop(); lfo.stop(); } catch (_e) {}
+      }, 300);
     },
   };
 }
