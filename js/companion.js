@@ -61,7 +61,10 @@ export const MODES = {
     beacon: CYAN, beaconFreq: 3.5,
   },
   trace: {
-    rotSpeed: 5.50, pulseAmp: 0.03, pulseFreq: 1.3,
+    // Base rotSpeed matches other reading modes. The Journey fast
+    // spin (~5.5) is now hover-driven — interactions.js calls
+    // companion.setSpeedBoost() when a .tl-item is hovered.
+    rotSpeed: 1.20, pulseAmp: 0.03, pulseFreq: 1.3,
     distortion: 0.22, noiseSpeed: 0.80,
     scanOpacity: 0.65, ambientParticles: 0.10,
     scale: 1.00, hue: 0.25, cursorTilt: 0.20,
@@ -392,6 +395,16 @@ export function createCompanion() {
   }
   function setHovered(b) {
     hovered = b ? 1 : 0;
+  }
+  // Multiplier applied on top of the current mode's rotSpeed. 1 = no
+  // boost. Interactions.js sets this to ~4-5 while hovering timeline
+  // items so SENTINEL's ring visibly accelerates on hover in Journey.
+  // Smooth-lerped in the update loop so the change reads as a
+  // spool-up / spool-down rather than a snap.
+  let speedBoostTarget = 1;
+  let speedBoost = 1;
+  function setSpeedBoost(f) {
+    speedBoostTarget = Math.max(0.25, Math.min(8, Number(f) || 1));
   }
   function setEmissionDir(dx, dy) {
     if (dx == null || dy == null) { emissionDir = null; return; }
@@ -740,11 +753,18 @@ export function createCompanion() {
     // three axes at incommensurate rates gives a proper gyroscope
     // feel — the ring presents different faces to the camera over
     // time without ever "settling" back to a previous orientation.
+    //
+    // Speed boost is smoothly lerped so hover-in / hover-out reads
+    // as a spool-up / spool-down, not a snap. The base rotSpeed
+    // stays modest in every mode; interactions.js dials the boost
+    // up while hovering timeline items in Journey.
+    speedBoost += (speedBoostTarget - speedBoost) * Math.min(1, dt * 3);
+    const effRotSpeed = cur.rotSpeed * speedBoost;
     scanMat.opacity = cur.scanOpacity;
     scanMat.color.copy(bodyColor);
-    scanRing.rotation.z += dt * (1.6 + cur.rotSpeed);
-    scanRing.rotation.y += dt * (0.95 + cur.rotSpeed * 0.45);
-    scanRing.rotation.x += dt * (0.42 + cur.rotSpeed * 0.20);
+    scanRing.rotation.z += dt * (1.6 + effRotSpeed);
+    scanRing.rotation.y += dt * (0.95 + effRotSpeed * 0.45);
+    scanRing.rotation.x += dt * (0.42 + effRotSpeed * 0.20);
 
     // Pulse rings — expand + fade. Negative userData.t is the
     // pre-roll delay used by the radar-echo emit path (2025-11 polish);
@@ -828,7 +848,7 @@ export function createCompanion() {
     // to 'orb' on tight viewports (< 720 px) and skipping setPreset calls
     // there — companion intentionally does not gate those from here.
     shapeSystem,
-    setMode, setHovered, setEmissionDir,
+    setMode, setHovered, setSpeedBoost, setEmissionDir,
     setLookAt, reachTowards, setPrefersReduced,
     emit, triggerBigPulse, getHue, update, dispose,
     // Testability hooks — Task 6.3 property tests (P4 + P5).

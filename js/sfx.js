@@ -728,40 +728,27 @@ const droneApproach = makeDrone((c, g) => {
   return [osc1, osc2, lfo];
 });
 
-// Journey — subtle sci-fi rotation. Distant "wuh-wuh" tremolo at
-// a fixed slow rate (3 Hz), NOT accelerating. Very quiet — reads
-// as a spinning object heard from far away, playing continuously
-// while SENTINEL's ring is spinning at trace-mode speed.
+// Journey — quiet section presence. Just a low sustained tone with
+// slow filter drift, matching the other section drones. The
+// spinning "wuh-wuh" now fires only while the user hovers a
+// timeline item (see `startSpin` below), so this drone is just
+// atmosphere for the section, not the spin itself.
 const droneJourney = makeDrone((c, g) => {
   const osc = c.createOscillator();
   osc.type = 'sine';
-  osc.frequency.value = 165; // E3 — sits under everything
+  osc.frequency.value = 110; // A2
   const filt = c.createBiquadFilter();
-  filt.type = 'lowpass'; filt.frequency.value = 500; filt.Q.value = 1.5;
-  // Amp tremolo (the "wuh-wuh")
-  const trem = c.createOscillator();
-  trem.type = 'sine';
-  trem.frequency.value = 3.0; // slow, steady rotation
-  const tremDepth = c.createGain(); tremDepth.gain.value = 0.55;
-  trem.connect(tremDepth);
-  // Vibrato at same rate for coherent wobble
-  const vib = c.createOscillator();
-  vib.type = 'sine';
-  vib.frequency.value = 3.0;
-  const vibDepth = c.createGain(); vibDepth.gain.value = 4;
-  vib.connect(vibDepth).connect(osc.frequency);
-
-  const level = c.createGain();
-  level.gain.value = 0; // base level; tremolo adds on top
-  tremDepth.connect(level.gain);
-  // Ensure gain floor above 0 so we always hear the tone through the
-  // tremolo swing. Base 0.03 + tremolo swing ±0.03 → 0..0.06.
-  level.gain.setValueAtTime(0.03, c.currentTime);
-
+  filt.type = 'lowpass'; filt.frequency.value = 520; filt.Q.value = 1.2;
+  const lfo = c.createOscillator();
+  lfo.type = 'sine';
+  lfo.frequency.value = 1 / 26;
+  const lfoDepth = c.createGain(); lfoDepth.gain.value = 200;
+  lfo.connect(lfoDepth).connect(filt.frequency);
+  const level = c.createGain(); level.gain.value = 0.035;
   osc.connect(filt).connect(level).connect(g);
   const now = c.currentTime;
-  osc.start(now); trem.start(now); vib.start(now);
-  return [osc, trem, vib];
+  osc.start(now); lfo.start(now);
+  return [osc, lfo];
 });
 
 // Work — steady scanning drone. Low sustained tone with a slow
@@ -1140,6 +1127,68 @@ export function hum() {
       setTimeout(() => {
         try { osc.stop(); lfo.stop(); } catch (_e) {}
       }, 350);
+    },
+  };
+}
+
+// Spinning sound — hover-only. Sustained low tone with tremolo +
+// vibrato at 4 Hz (steady, not accelerating) that reads as SENTINEL
+// spinning while the user reads a timeline item. Returns { stop }
+// handle for on-leave cleanup. Very subtle so it sits under the
+// section drone without overwhelming it.
+export function startSpin() {
+  if (!enabled) return { stop: () => {} };
+  const c = ensureCtx();
+  if (!c) return { stop: () => {} };
+  if (c.state === 'suspended') c.resume();
+  const now = c.currentTime;
+  const out = toSfxBus();
+
+  const osc = c.createOscillator();
+  osc.type = 'sine';
+  osc.frequency.value = 220; // A3 — sits under speech range
+
+  const filt = c.createBiquadFilter();
+  filt.type = 'lowpass';
+  filt.frequency.value = 700;
+  filt.Q.value = 1.4;
+
+  // Tremolo (the "wuh-wuh") — 4 Hz steady rotation. Depth is
+  // subtractive so the base gain becomes the ceiling; the tremolo
+  // dips beneath it periodically.
+  const trem = c.createOscillator();
+  trem.type = 'sine';
+  trem.frequency.value = 4.0;
+  const tremDepth = c.createGain(); tremDepth.gain.value = 0.05;
+  trem.connect(tremDepth);
+
+  // Vibrato at same rate for coherent wobble
+  const vib = c.createOscillator();
+  vib.type = 'sine';
+  vib.frequency.value = 4.0;
+  const vibDepth = c.createGain(); vibDepth.gain.value = 5;
+  vib.connect(vibDepth).connect(osc.frequency);
+
+  const g = c.createGain();
+  g.gain.setValueAtTime(0, now);
+  g.gain.linearRampToValueAtTime(0.09, now + 0.4); // 400 ms fade in
+  tremDepth.connect(g.gain);
+
+  osc.connect(filt).connect(g).connect(out);
+  osc.start(now); trem.start(now); vib.start(now);
+
+  let stopped = false;
+  return {
+    stop() {
+      if (stopped) return;
+      stopped = true;
+      const nowS = c.currentTime;
+      g.gain.cancelScheduledValues(nowS);
+      g.gain.setValueAtTime(g.gain.value, nowS);
+      g.gain.linearRampToValueAtTime(0, nowS + 0.5);
+      setTimeout(() => {
+        try { osc.stop(); trem.stop(); vib.stop(); } catch (_e) {}
+      }, 550);
     },
   };
 }

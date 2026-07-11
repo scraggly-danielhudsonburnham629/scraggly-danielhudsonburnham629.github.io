@@ -151,8 +151,11 @@ function renderTimeline() {
  *     ends at the last dot's centre, so no exposed rail extends above
  *     the top dot or below the bottom one.
  *
- * Runs after renderTimeline, again 250 ms later (font-load safety),
- * and on window resize.
+ * Uses `offsetTop` / `offsetHeight` rather than `getBoundingClientRect`
+ * so measurement is transform-independent — CSS reveal animations
+ * (translateY on `[data-reveal]`) or hover magnetic pulls don't skew
+ * the position. Runs after renderTimeline, again on font-ready, and
+ * on window resize.
  */
 function alignTimelineRail() {
   const list = document.querySelector('.timeline--editorial');
@@ -160,16 +163,22 @@ function alignTimelineRail() {
   const items = list.querySelectorAll('.tl-item');
   if (items.length === 0) return;
 
-  const listRect = list.getBoundingClientRect();
   const dotCentersInList = [];
 
   items.forEach((item) => {
-    const anchor = item.querySelector('.tl-year') || item;
-    const anchorRect = anchor.getBoundingClientRect();
-    const itemRect   = item.getBoundingClientRect();
-    const dotYWithinItem = (anchorRect.top + anchorRect.height / 2) - itemRect.top;
+    const anchor = item.querySelector('.tl-year');
+    // offsetTop / offsetHeight give layout coords ignoring any CSS
+    // transforms currently applied. `.tl-item` has `position: relative`
+    // so it's the offsetParent for its descendants, and `.tl-item`
+    // itself has offsetTop relative to the list.
+    let dotYWithinItem;
+    if (anchor) {
+      dotYWithinItem = anchor.offsetTop + anchor.offsetHeight / 2;
+    } else {
+      dotYWithinItem = 22; // fallback
+    }
     item.style.setProperty('--dot-y', `${dotYWithinItem}px`);
-    dotCentersInList.push((anchorRect.top + anchorRect.height / 2) - listRect.top);
+    dotCentersInList.push(item.offsetTop + dotYWithinItem);
   });
 
   if (dotCentersInList.length >= 1) {
@@ -552,18 +561,36 @@ function boot() {
   renderContact();
   initClock();
 
-  // Timeline rail + dots — procedural alignment. Fires now for the
-  // initial layout, again 250 ms later so late web-font swaps don't
-  // leave stale positions, and on window resize (debounced 80 ms).
-  requestAnimationFrame(() => {
-    alignTimelineRail();
-    setTimeout(alignTimelineRail, 250);
-  });
+  // Timeline rail + dots — procedural alignment. Runs at every point
+  // where the layout could have changed:
+  //   • On next frame — initial mount, styles applied
+  //   • On document.fonts.ready — after web fonts swap (line-heights
+  //     shift when fallback fonts get replaced)
+  //   • On window resize — browser zoom (Ctrl+/-) and window resize
+  //   • On visualViewport resize — pinch-zoom on mobile / trackpad
+  //   • On ResizeObserver — timeline element itself changes size
+  //     (media-query breakpoints, container queries, dynamic content)
+  requestAnimationFrame(alignTimelineRail);
+  if (document.fonts && document.fonts.ready) {
+    document.fonts.ready.then(alignTimelineRail).catch(() => {});
+  }
+
   let alignRailTimer = null;
-  window.addEventListener('resize', () => {
+  const scheduleAlign = () => {
     clearTimeout(alignRailTimer);
     alignRailTimer = setTimeout(alignTimelineRail, 80);
-  });
+  };
+  window.addEventListener('resize', scheduleAlign);
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener('resize', scheduleAlign);
+  }
+  if (typeof ResizeObserver !== 'undefined') {
+    const timelineEl = document.querySelector('.timeline--editorial');
+    if (timelineEl) {
+      const ro = new ResizeObserver(scheduleAlign);
+      ro.observe(timelineEl);
+    }
+  }
 
   // Wire the placeholder resume + linkedin links so they're easy to find later
   const resumeBtn = document.getElementById('resume-btn');

@@ -458,6 +458,11 @@ export function initInteractions({
   // via the orchestrator, rotate toward it, emit a pulse. No
   // scanner retarget or sibling dimming (those are project-only).
   // -----------------------------------------------------------
+  // Handles for the spin state (Journey). WeakMap ties a hover to
+  // its running spin SFX + boost, so leaving one item and quickly
+  // entering another swaps cleanly.
+  const activeSpins = new WeakMap();
+
   function onContentEnter(el) {
     el.classList.add('is-hover');
     activeContentEl = el;
@@ -468,6 +473,17 @@ export function initInteractions({
     // drawSkillGroupRaycast below.
     if (el.classList.contains('tl-item')) {
       sfx.journey();
+      // Journey behaviour is hover-driven: SENTINEL's ring only
+      // spools up while the user hovers a timeline item, and the
+      // spinning "wuh-wuh" plays only during that same window.
+      if (companion && companion.setSpeedBoost) companion.setSpeedBoost(4.5);
+      if (!prefersReduced) {
+        const existing = activeSpins.get(el);
+        if (!existing || !existing.spin) {
+          const spin = sfx.startSpin();
+          activeSpins.set(el, { spin });
+        }
+      }
     } else if (el.classList.contains('trophy')) {
       sfx.verify();
     } else if (!el.classList.contains('mf-group')) {
@@ -525,6 +541,15 @@ export function initInteractions({
     // verified, nothing to cancel.
     if (el.classList.contains('trophy')) {
       cancelTrophyHold(el);
+    }
+
+    // Spool SENTINEL back down + stop the spin SFX when leaving a
+    // timeline item. Only affects Journey; no-op elsewhere.
+    if (el.classList.contains('tl-item')) {
+      if (companion && companion.setSpeedBoost) companion.setSpeedBoost(1);
+      const s = activeSpins.get(el);
+      if (s && s.spin && s.spin.stop) s.spin.stop();
+      activeSpins.delete(el);
     }
 
     if (prefersReduced) return;
