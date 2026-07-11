@@ -408,10 +408,18 @@ export function initInteractions({
   // holds the fan lit for as long as the cursor stays on the item;
   // clearTarget() on leave retracts it.
   // -----------------------------------------------------------
+  // Contact meta hover currently plays a sustained hum. WeakMap
+  // stashes the audio handle per element so leave can .stop() it.
+  const contactHums = new WeakMap();
+
   function onContactMetaEnter(el) {
     el.classList.add('is-hover');
     sfx.blip();
     if (prefersReduced) return;
+
+    // Sustained hum for the duration of the hover — decays out on
+    // leave. Reads as "SENTINEL is listening / focusing on this."
+    contactHums.set(el, sfx.hum());
 
     // `anchor: 'below'` forces SENTINEL to park directly under the
     // hovered item — the scan-fan then visibly rises from SENTINEL
@@ -431,6 +439,10 @@ export function initInteractions({
 
   function onContactMetaLeave(el) {
     el.classList.remove('is-hover');
+    const hum = contactHums.get(el);
+    if (hum && hum.stop) hum.stop();
+    contactHums.delete(el);
+
     if (prefersReduced) return;
     if (orchestrator) orchestrator.setHoverTarget(null);
     if (scanFan && scanFan.clearTarget) scanFan.clearTarget();
@@ -449,7 +461,18 @@ export function initInteractions({
   function onContentEnter(el) {
     el.classList.add('is-hover');
     activeContentEl = el;
-    sfx.blip();
+    // Section-flavoured hover SFX. Each element kind picks a sound
+    // that matches what SENTINEL is doing in that section — Approach
+    // items get a generic blip, Journey items chirp, trophies get
+    // the warmer verify blip, mf-groups get their scan sound via
+    // drawSkillGroupRaycast below.
+    if (el.classList.contains('tl-item')) {
+      sfx.journey();
+    } else if (el.classList.contains('trophy')) {
+      sfx.verify();
+    } else if (!el.classList.contains('mf-group')) {
+      sfx.blip();
+    }
 
     // Trophy hold-to-verify. Hovering for TROPHY_HOLD_MS runs the two
     // green scan lines up the card border; when they meet at the top,
@@ -551,10 +574,12 @@ export function initInteractions({
     };
     aimAtTrophy();
     if (companion && !prefersReduced) companion.emit('checkmark');
+    sfx.analyze(); // rising analyze tick on every pulse for audible feedback
 
     const pulseId = setInterval(() => {
       aimAtTrophy();
       if (companion && !prefersReduced) companion.emit('checkmark');
+      sfx.analyze();
     }, TROPHY_PULSE_MS);
 
     const verifyId = setTimeout(() => finishTrophyHold(el), TROPHY_HOLD_MS);
@@ -843,6 +868,7 @@ export function initInteractions({
     if (scanFan && scanFan.setTarget) {
       scanFan.setTarget(groupEl, { duration: RAYCAST_MS });
     }
+    sfx.laser();
 
     // Stagger the per-item `.scanning` flashes across the fan's sweep
     // so each row / key visibly reacts as the beam passes. We
@@ -922,6 +948,11 @@ export function initInteractions({
           } else {
             companion.emit('checkmark');
           }
+        }
+
+        // Section-specific audio for the attention beat.
+        if (isVision) {
+          sfx.broadcast();
         }
 
         // Cert row sweep + stamp. Add `.scanning` for the sweep

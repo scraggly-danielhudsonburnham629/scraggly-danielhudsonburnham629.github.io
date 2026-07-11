@@ -1,31 +1,46 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32" fill="none">
   <!--
-    SENTINEL favicon — cyan/violet gradient orb with a scan ring,
-    matching the on-page character. Renders at 16 / 32 / 48 / etc.
-    Uses inline gradients so no external stylesheet is required.
-    `width` + `height` attrs are explicit (some Chrome builds skip
-    SVG favicons that only declare a viewBox).
+    SENTINEL favicon (v3) — medallion design mirroring the trophy
+    verify seal. Concentric rings with four cardinal teeth and a
+    central star, all stroked in a cyan → violet gradient. Clean
+    at 16 px thanks to 4-fold symmetry and thick line weights.
   -->
   <defs>
-    <radialGradient id="body" cx="45%" cy="40%" r="65%">
-      <stop offset="0%"   stop-color="#a5f3fc" stop-opacity="1"/>
-      <stop offset="45%"  stop-color="#6ee7f9" stop-opacity="0.95"/>
-      <stop offset="85%"  stop-color="#a78bfa" stop-opacity="0.85"/>
-      <stop offset="100%" stop-color="#3b3b5a" stop-opacity="0.4"/>
+    <linearGradient id="fv-stroke" x1="0" y1="0" x2="32" y2="32" gradientUnits="userSpaceOnUse">
+      <stop offset="0%"   stop-color="#6ee7f9"/>
+      <stop offset="55%"  stop-color="#a5f3fc"/>
+      <stop offset="100%" stop-color="#a78bfa"/>
+    </linearGradient>
+    <radialGradient id="fv-bg" cx="50%" cy="45%" r="70%">
+      <stop offset="0%"   stop-color="#101024"/>
+      <stop offset="100%" stop-color="#06060b"/>
     </radialGradient>
-    <radialGradient id="core" cx="50%" cy="50%" r="50%">
-      <stop offset="0%"   stop-color="#eef0f6" stop-opacity="1"/>
-      <stop offset="70%"  stop-color="#a5f3fc" stop-opacity="0.9"/>
-      <stop offset="100%" stop-color="#a5f3fc" stop-opacity="0"/>
-    </radialGradient>
-    <linearGradient id="ring" x1="0" y1="16" x2="32" y2="16">
-      <stop offset="0%"   stop-color="#6ee7f9" stop-opacity="0"/>
-      <stop offset="50%"  stop-color="#6ee7f9" stop-opacity="0.85"/>
-      <stop offset="100%" stop-color="#a78bfa" stop-opacity="0"/>
+    <linearGradient id="fv-star" x1="16" y1="10" x2="16" y2="22" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#a5f3fc"/>
+      <stop offset="100%" stop-color="#6ee7f9"/>
     </linearGradient>
   </defs>
-  <rect width="32" height="32" fill="#06060b" rx="4"/>
-  <circle cx="16" cy="16" r="10" fill="url(#body)"/>
-  <circle cx="16" cy="16" r="3.5" fill="url(#core)"/>
-  <ellipse cx="16" cy="16" rx="12" ry="3.5" fill="none" stroke="url(#ring)" stroke-width="1.2" transform="rotate(-18 16 16)"/>
+
+  <!-- Backdrop -->
+  <rect width="32" height="32" rx="6" fill="url(#fv-bg)"/>
+
+  <!-- 4 outer teeth at N/S/E/W (subtle, extends outside the outer ring) -->
+  <g fill="url(#fv-stroke)">
+    <rect x="15.25" y="1.5"  width="1.5" height="3.2" rx="0.4"/>
+    <rect x="15.25" y="27.3" width="1.5" height="3.2" rx="0.4"/>
+    <rect x="1.5"  y="15.25" width="3.2" height="1.5" rx="0.4"/>
+    <rect x="27.3" y="15.25" width="3.2" height="1.5" rx="0.4"/>
+  </g>
+
+  <!-- Outer ring -->
+  <circle cx="16" cy="16" r="11.5" fill="none" stroke="url(#fv-stroke)" stroke-width="1.3"/>
+
+  <!-- Inner notched ring — four quarter arcs with N/S/E/W gaps.
+       Draws with stroke-dasharray to leave gaps at cardinals. -->
+  <circle cx="16" cy="16" r="7.5" fill="none" stroke="url(#fv-stroke)" stroke-width="1.2"
+          stroke-dasharray="7 3.8" stroke-dashoffset="-1.9"/>
+
+  <!-- Center 5-point star — the "seal" mark -->
+  <path d="M 16 10.6 L 17.2 13.9 L 20.7 13.9 L 17.9 16 L 19 19.3 L 16 17.3 L 13 19.3 L 14.1 16 L 11.3 13.9 L 14.8 13.9 Z"
+        fill="url(#fv-star)"/>
 </svg>
