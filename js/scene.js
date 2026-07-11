@@ -49,6 +49,7 @@ import { createTextRegions } from './textRegions.js';
 import { initReveal } from './reveal.js';
 import { initLayoutMotion } from './layoutMotion.js';
 import { SECTION_BEHAVIORS } from './data.js';
+import * as sfx from './sfx.js';
 
 // Section homes for buddy fallback when the orchestrator has no target
 // element (Vision broadcast beats, etc). Kept as arrays of normalized
@@ -553,6 +554,11 @@ export function initScene(canvas, { onProgress, onReady } = {}) {
             companion.shapeSystem.nudge('orb', { transient: true, duration: 1.2 });
           } catch (_e) { /* nudge is best-effort */ }
         }
+        // Poke SFX — SENTINEL's own resonance sound. Must fire here
+        // (not in interactions.js) because we call stopPropagation
+        // below to prevent card-click leakage, which also cuts off
+        // the delegated onClick handler in interactions.js.
+        sfx.poke();
         e.stopPropagation();
         e.preventDefault();
       }
