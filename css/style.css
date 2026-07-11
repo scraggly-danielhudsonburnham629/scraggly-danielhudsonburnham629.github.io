@@ -388,6 +388,54 @@ button { font-family: inherit; }
   pointer-events: none;
 }
 
+/* SFX mute toggle — persistent top-right circular button. Shows the
+   speaker glyph when audio is on, the crossed-out speaker when muted.
+   Colour follows the accent so it visually pairs with SENTINEL. */
+.sfx-toggle {
+  position: fixed;
+  top: 22px;
+  right: 22px;
+  z-index: 30;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: rgba(6, 6, 11, 0.7);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  color: var(--accent);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 200ms var(--ease), border-color 200ms var(--ease),
+              transform 220ms var(--ease), background 200ms var(--ease);
+}
+.sfx-toggle:hover {
+  color: var(--accent-2);
+  border-color: rgba(167, 139, 250, 0.4);
+  transform: scale(1.05);
+}
+.sfx-toggle:active { transform: scale(0.95); }
+.sfx-toggle__icon {
+  width: 18px;
+  height: 18px;
+  display: none;
+}
+.sfx-toggle__icon--on  { display: block; }
+.sfx-toggle.is-muted { color: var(--text-mute); }
+.sfx-toggle.is-muted:hover { color: var(--danger); }
+.sfx-toggle.is-muted .sfx-toggle__icon--on  { display: none; }
+.sfx-toggle.is-muted .sfx-toggle__icon--off { display: block; }
+
+/* Push the toggle further inboard on mobile so it doesn't fight the
+   status widget's mobile pinned position (bottom-right ~190 px up). */
+@media (max-width: 720px) {
+  .sfx-toggle { top: 16px; right: 16px; width: 32px; height: 32px; }
+  .sfx-toggle__icon { width: 16px; height: 16px; }
+}
+
 /* Companion HUD — DOM label that follows the 3D drone.
    JS drives the transform every frame; CSS just provides the styling
    and a fade-in on load. */

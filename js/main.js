@@ -24,6 +24,7 @@ import { initCursor } from './cursor.js';
 import { initScroll, initCardHover } from './scroll.js';
 import { initInteractions } from './interactions.js';
 import { initModal } from './modal.js';
+import * as sfx from './sfx.js';
 // NOTE: initReveal + initLayoutMotion moved into scene.js (Task 12.1) so
 // scene.js can tear them down and rebuild them on `prefers-reduced-motion`
 // change events (R11.2). main.js no longer imports them directly.
@@ -526,6 +527,26 @@ function boot() {
 
   const labelEl  = document.getElementById('companion-label');
   const statusEl = document.querySelector('.status');
+
+  // SFX toggle wiring. Reflect the current mute state on the button
+  // via `.is-muted` and `aria-pressed`, sync both on every toggle.
+  const sfxBtn = document.getElementById('sfx-toggle');
+  function syncSfxBtn() {
+    if (!sfxBtn) return;
+    const on = sfx.isEnabled();
+    sfxBtn.classList.toggle('is-muted', !on);
+    sfxBtn.setAttribute('aria-pressed', on ? 'true' : 'false');
+    sfxBtn.setAttribute('aria-label', on ? 'Mute sound effects' : 'Enable sound effects');
+  }
+  if (sfxBtn) {
+    syncSfxBtn();
+    sfxBtn.addEventListener('click', () => {
+      sfx.toggle();
+      syncSfxBtn();
+      if (sfx.isEnabled()) sfx.blip(); // audible confirmation when unmuting
+    });
+  }
+
   initScroll({
     onSectionChange: (idx) => {
       const label = SENTINEL_LABELS[Math.min(idx, SENTINEL_LABELS.length - 1)];
@@ -541,6 +562,9 @@ function boot() {
       // hero copy, but competes with content in later sections. Hide
       // as soon as SENTINEL crosses out of hero (section index > 0).
       if (statusEl) statusEl.classList.toggle('is-hidden', idx > 0);
+      // Radar-sweep sound on section change. Cheap way to reinforce
+      // the "SENTINEL is now looking at this" moment.
+      sfx.whoosh();
     },
   });
   initCardHover();

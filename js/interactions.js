@@ -34,6 +34,8 @@
 // Design: §Interaction Layer, §CSS Hooks
 // -------------------------------------------------------------
 
+import * as sfx from './sfx.js';
+
 // Selectors we listen for at the delegation level. Kept as constants
 // so they're easy to audit against the task instructions.
 const SEL_PROJECT   = '.work__spotlight, .work__row, .card[data-project-id]';
@@ -229,6 +231,7 @@ export function initInteractions({
   // -----------------------------------------------------------
   function onProjectEnter(el) {
     el.classList.add('is-hover', 'card--focus-veil');
+    sfx.blip();
 
     // Dim sibling projects in the same list. Siblings are the other
     // .work__row items inside the same <ol class="work__list">, plus
@@ -354,6 +357,7 @@ export function initInteractions({
   // -----------------------------------------------------------
   function onEmailEnter(el) {
     el.classList.add('is-pulled');
+    sfx.blip();
     if (prefersReduced) return;
     const rect = el.getBoundingClientRect();
     if (companion) {
@@ -406,6 +410,7 @@ export function initInteractions({
   // -----------------------------------------------------------
   function onContactMetaEnter(el) {
     el.classList.add('is-hover');
+    sfx.blip();
     if (prefersReduced) return;
 
     // `anchor: 'below'` forces SENTINEL to park directly under the
@@ -444,6 +449,7 @@ export function initInteractions({
   function onContentEnter(el) {
     el.classList.add('is-hover');
     activeContentEl = el;
+    sfx.blip();
 
     // Trophy hold-to-verify. Hovering for TROPHY_HOLD_MS runs the two
     // green scan lines up the card border; when they meet at the top,
@@ -574,6 +580,7 @@ export function initInteractions({
     el.classList.add('verifying', 'verified');
     // Final green pulse coinciding with the flip.
     if (companion && !prefersReduced) companion.emit('checkmark');
+    sfx.chime();
     setTimeout(() => el.classList.remove('verifying'), TROPHY_FLIP_MS);
   }
 
@@ -738,6 +745,7 @@ export function initInteractions({
           if (shapes && !prefersReduced) {
             shapes.nudge('orb', { transient: true, duration: POKE_MORPH_MS / 1000 });
           }
+          sfx.click();
           return;
         }
       }
@@ -760,6 +768,7 @@ export function initInteractions({
         companion.emit('documents_out');
       }
       companion.triggerBigPulse();
+      sfx.click();
     }
   };
 
@@ -907,12 +916,14 @@ export function initInteractions({
 
         // Cert row sweep + stamp. Add `.scanning` for the sweep
         // animation, then `.scanned` for the permanent code stamp
-        // once the sweep has cleared the row.
+        // once the sweep has cleared the row. A soft tick lands with
+        // the stamp so the moment reads audibly.
         if (el.classList.contains('cert-row')) {
           el.classList.add('scanning');
           setTimeout(() => {
             el.classList.remove('scanning');
             el.classList.add('scanned');
+            sfx.tick();
           }, CERT_SWEEP_MS);
         }
 

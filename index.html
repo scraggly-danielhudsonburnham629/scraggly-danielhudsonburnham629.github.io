@@ -7,7 +7,13 @@
   <meta name="description" content="Portfolio of Tang Trung Son (Son) — AI Engineer at Rackspace. Enterprise AI, multi-agent systems, human-AI collaboration." />
   <meta name="theme-color" content="#07070c" />
 
+  <!-- Favicon set. SVG covers every modern browser (Chrome 80+,
+       Safari 15+, Firefox 41+). Apple-touch-icon points at the same
+       SVG for iOS home-screen bookmarks. `mask-icon` lets Safari
+       pinned tabs tint the mark with the accent color. -->
   <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
+  <link rel="apple-touch-icon" href="./favicon.svg" />
+  <link rel="mask-icon" href="./favicon.svg" color="#6ee7f9" />
 
   <meta property="og:title" content="Tang Trung Son — AI Systems Engineer" />
   <meta property="og:description" content="Building production AI agents, copilots, and enterprise systems that augment expert workflows." />
@@ -112,6 +118,23 @@
     <span class="companion-hud__dot"></span>
     <span class="companion-hud__label" id="companion-label">SYSTEM · READY</span>
   </aside>
+
+  <!-- SFX mute toggle - top-right, persistent across all sections.
+       Two inline SVGs, CSS shows the one matching the current state
+       via `.is-muted`. Wired in main.js. -->
+  <button id="sfx-toggle" class="sfx-toggle" type="button"
+          aria-label="Toggle sound effects" aria-pressed="true"
+          data-cursor="hover">
+    <svg class="sfx-toggle__icon sfx-toggle__icon--on"  viewBox="0 0 20 20" aria-hidden="true">
+      <path d="M4 7v6h3l4 3V4L7 7H4z" fill="currentColor"/>
+      <path d="M13.5 6.5a4 4 0 0 1 0 7"  fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+      <path d="M15.5 4.5a7 7 0 0 1 0 11" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+    </svg>
+    <svg class="sfx-toggle__icon sfx-toggle__icon--off" viewBox="0 0 20 20" aria-hidden="true">
+      <path d="M4 7v6h3l4 3V4L7 7H4z" fill="currentColor"/>
+      <path d="M13.5 7l4 6 M17.5 7l-4 6" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+    </svg>
+  </button>
 
   <main id="top">
     <!-- =============== HERO =============== -->
